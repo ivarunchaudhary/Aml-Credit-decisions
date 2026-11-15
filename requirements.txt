@@ -1,0 +1,16 @@
+# Python 3.11 (tested with 3.11.14). Exact versions used for the reported results are
+# frozen in requirements-lock.txt (generated with `pip freeze`).
+numpy
+pandas
+scikit-learn
+scipy
+shap
+matplotlib
+cryptography
+nbformat
+nbconvert
+ipykernel
+pytest
+python-docx
+docx2pdf
+pypdf

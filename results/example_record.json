@@ -1,0 +1,44 @@
+{
+  "body": {
+    "v": 1,
+    "seq": 43,
+    "ts": "2026-11-01T09:00:43Z",
+    "model_fp": "edf791723ac6ecf3c580a36b2450683771d40ab3b24867abe2abe46695962a67",
+    "explainer_cfg_digest": "d5ea824412aa97a96c09ac944939cd3303fd9c05425246db618bca5857acb0ae",
+    "input_commitment": "2952c6b5d64ae77b636c21f25c4fe24b979de7fa92bcb4a6862af6cb97ad56b9",
+    "score": 901158,
+    "threshold": 100000,
+    "decision": "REJECT",
+    "base_value": 419172,
+    "attributions": {
+      "checking_status": 133094,
+      "duration": 163502,
+      "credit_history": 11650,
+      "purpose": -10752,
+      "credit_amount": 5484,
+      "savings_status": 50563,
+      "employment": 62531,
+      "installment_commitment": 30209,
+      "personal_status": 8006,
+      "other_parties": 254,
+      "residence_since": -3960,
+      "property_magnitude": -9466,
+      "age": 15591,
+      "other_payment_plans": -14900,
+      "housing": 43650,
+      "existing_credits": -6261,
+      "job": 5735,
+      "num_dependents": -673,
+      "own_telephone": -2270,
+      "foreign_worker": 0
+    },
+    "reasons": [
+      "duration",
+      "checking_status",
+      "employment"
+    ],
+    "prev_hash": "7530343cbbcb88cb79fcaed6c7b5ffcfb0139ba0cdea6f58afa55adaf4f76461"
+  },
+  "hash": "90b66f341804693ea5947bc0289cda41a9e55e1deea4c5f5a0f16d0597198cd6",
+  "sig": "40345f789418ac12fcf5fd7dcb4b2015dcb544557ecf5430d87779d34ad12225ec296a5c2e0ca799034eb2f87499f8613e48658b1f358d83b0325496cb83500c"
+}

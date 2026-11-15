@@ -1,0 +1,11 @@
+attack,description,V0 Plain log,V1 +Record hash,V2 +Hash chain,V3 +Signatures,V4 +Anchored checkpoints,V5 +Applicant receipts,V6 +Additivity gate,V7 TEXL (+Replay)
+A1,"Edit one attribution, no re-hash (outsider)",0.0,100.0,100.0,100.0,100.0,100.0,100.0,100.0
+A2,"Flip decision, re-hash tail, no key (outsider)",0.0,0.0,0.0,100.0,100.0,100.0,100.0,100.0
+A3,"Flip decision, re-hash + re-sign tail (insider)",0.0,0.0,0.0,0.0,84.0,90.0,90.0,100.0
+A4,"Delete a record, re-link + re-sign (insider)",0.0,0.0,0.0,0.0,87.5,94.5,94.5,94.5
+A5,"Swap two adjacent records, re-sign (insider)",0.0,0.0,0.0,0.0,80.5,89.5,89.5,89.5
+A6,Truncate the last 5 records (insider),0.0,0.0,0.0,0.0,0.0,21.5,21.5,21.5
+A7,Fairwash at birth: zero protected attributions (insider),0.0,0.0,0.0,0.0,0.0,0.0,100.0,100.0
+A8,"Fairwash at birth: move protected mass, sum kept (insider)",0.0,0.0,0.0,0.0,0.0,0.0,0.0,100.0
+A9,Undisclosed model substitution at birth (insider),0.0,0.0,0.0,0.0,0.0,0.0,0.0,100.0
+Honest,No tampering (false-alarm rate),0.0,0.0,0.0,0.0,0.0,0.0,0.0,0.0

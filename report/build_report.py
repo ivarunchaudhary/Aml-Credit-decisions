@@ -363,7 +363,7 @@ for k in ["logreg", "rf", "gbm"]:
                  f"{o['verify_per_record_ms']:.3f}", f"{o['receipt_verify_ms']:.3f}", f"{o['record_bytes']:.0f}",
                  f"{o['receipts_valid']}/{o['receipts_total']}"])
 table(doc, ["Model", "Predict", "Explain", "Ledger append", "Verify/record", "Receipt verify", "Bytes/record",
-            "Receipts valid"], rows, [1.35, 0.8, 0.9, 0.95, 0.85, 0.85, 0.8, 0.7], size=8,
+            "Receipts valid"], rows, [1.25, 0.78, 0.85, 0.92, 0.85, 0.85, 0.8, 0.7], size=8,
       align_cols=["left"] + ["center"] * 7)
 s_max = SC[scale_max]
 para(doc, f"Table V shows that hashing, signing and receipt creation cost about {OV[P]['ledger_append_ms'][0]:.2f} ms per "

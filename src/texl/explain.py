@@ -17,6 +17,8 @@ operator cannot silently swap it to steer explanations.
 
 from __future__ import annotations
 
+from typing import Any, Callable, Sequence
+
 import numpy as np
 
 from . import canonical
@@ -100,3 +102,99 @@ def top_reasons(phi: np.ndarray, names, k: int = 3) -> list[str]:
     """Adverse-action style reasons: the k attributes that increased risk the most."""
     order = np.argsort(-np.asarray(phi), kind="stable")
     return [names[i] for i in order[:k] if phi[i] > 0]
+
+
+def evaluate_seed_stability(
+    model: Callable[[np.ndarray], np.ndarray] | Any,
+    X: np.ndarray,
+    B: np.ndarray,
+    seeds: Sequence[int] = (0, 1, 2, 3, 4),
+    P: int = 16,
+    k: int = 3,
+) -> dict[str, Any]:
+    """Measure how sensitive permutation-Shapley attributions are to the permutation seed.
+
+    For every seed a :class:`PermutationShapley` explainer is built with the same background
+    set ``B`` and permutation count ``P``, and every applicant in ``X`` is explained.  Then, for
+    each applicant and each unordered pair of seeds, two agreement scores are computed and
+    averaged over all (applicant, seed-pair) combinations:
+
+    * **Spearman rank correlation** between the two attribution vectors.  Pairs where either
+      vector is constant (rank correlation undefined) are skipped.
+    * **Top-k adverse-action overlap**: the reasons produced by :func:`top_reasons` (the ``k``
+      features that *increased* risk the most, positive attributions only) are compared as
+      sets, scoring ``|A & B| / max(|A|, |B|)``.  If both sets are empty (no feature raised
+      risk under either seed) the pair counts as full agreement (1.0).
+
+    Args:
+        model: Either a callable ``f(Z) -> P(bad | Z)`` taking a 2-D array and returning a 1-D
+            array of probabilities, or an estimator exposing ``predict_proba`` (column 1 is
+            used as ``P(bad)``).
+        X: Applicant instances to explain, shape ``(n, d)`` (a single 1-D row is accepted).
+        B: Background reference set, shape ``(m, d)``.
+        seeds: Permutation seeds to compare; at least two distinct values are required.
+        P: Number of permutations per explainer; must be even (antithetic pairs).
+        k: Number of adverse-action reasons to compare (default 3).
+
+    Returns:
+        A dictionary with keys:
+
+        * ``mean_spearman`` (float): mean pairwise Spearman correlation (``nan`` if every pair
+          was undefined).
+        * ``mean_top3_overlap`` (float): mean pairwise top-``k`` adverse-action overlap in [0, 1].
+        * ``seeds`` (list[int]), ``n_permutations`` (int), ``n_instances`` (int),
+          ``n_pairs`` (int, seed pairs per instance), ``k`` (int).
+
+    Raises:
+        ValueError: if fewer than two seeds are given or any seed repeats, ``P`` is odd, or
+            the feature dimensions of ``X`` and ``B`` differ.
+        TypeError: if ``model`` is neither callable nor exposes ``predict_proba``.
+    """
+    from itertools import combinations
+
+    from scipy.stats import spearmanr
+
+    seeds = [int(s) for s in seeds]
+    if len(seeds) < 2 or len(set(seeds)) != len(seeds):
+        raise ValueError("evaluate_seed_stability needs at least two seeds, all distinct")
+    X = np.atleast_2d(np.asarray(X, dtype=float))
+    B = np.asarray(B, dtype=float)
+    if X.shape[1] != B.shape[1]:
+        raise ValueError(f"X has {X.shape[1]} features but B has {B.shape[1]}")
+
+    if callable(model):
+        predict_fn = model
+    elif hasattr(model, "predict_proba"):
+        predict_fn = lambda Z: model.predict_proba(Z)[:, 1]  # noqa: E731
+    else:
+        raise TypeError("model must be callable or expose predict_proba")
+
+    names = [f"x{j}" for j in range(B.shape[1])]
+    # phis[s, i, :] = attribution of applicant i under seed s
+    phis = np.array([
+        [PermutationShapley(predict_fn, B, names, n_permutations=P, seed=s).explain(x)[1] for x in X]
+        for s in seeds
+    ])
+
+    rhos: list[float] = []
+    overlaps: list[float] = []
+    pairs = list(combinations(range(len(seeds)), 2))
+    for i in range(X.shape[0]):
+        reasons = [set(top_reasons(phis[s, i], names, k=k)) for s in range(len(seeds))]
+        for a, b in pairs:
+            pa, pb = phis[a, i], phis[b, i]
+            if np.ptp(pa) > 0 and np.ptp(pb) > 0:
+                rhos.append(float(spearmanr(pa, pb).statistic))
+            ra, rb = reasons[a], reasons[b]
+            denom = max(len(ra), len(rb))
+            overlaps.append(1.0 if denom == 0 else len(ra & rb) / denom)
+
+    return {
+        "mean_spearman": float(np.mean(rhos)) if rhos else float("nan"),
+        "mean_top3_overlap": float(np.mean(overlaps)),
+        "seeds": seeds,
+        "n_permutations": int(P),
+        "n_instances": int(X.shape[0]),
+        "n_pairs": len(pairs),
+        "k": int(k),
+    }

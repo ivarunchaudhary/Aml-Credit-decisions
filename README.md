@@ -31,6 +31,25 @@ verifier levels V0–V7), the effect of the epoch size on insider attacks in the
 overhead, scalability and explanation fidelity (incl. agreement with the SHAP library's KernelExplainer).
 A full run takes about 12 minutes on a laptop CPU.
 
+### Explainer seed stability
+
+`evaluate_seed_stability(model, X, B, seeds, P)` in `src/texl/explain.py` checks how much the permutation seed moves
+the explanation. It builds one permutation-Shapley explainer per seed (same background set `B`, same budget `P`),
+explains every applicant in `X`, and averages over all seed pairs the **Spearman rank correlation** of the
+attributions and the **top-3 adverse-action overlap** (risk-raising reasons from `top_reasons`). Attributions are
+rounded to 12 decimals before ranking (`round_decimals`) so float noise on tied features does not count as instability.
+`model` is either `f(Z) -> P(bad)` or an estimator with `predict_proba`.
+
+`scripts/check_explainer_stability.py` uses the same split, model and background set as `run_experiments.py`
+(seed 42) and prints P, mean Spearman, mean top-3 overlap and runtime for P = 4, 8, 16, 32, 64 with seeds 0–4.
+It writes nothing to `results/` and takes a few minutes, mostly at P = 64.
+
+```bash
+.venv/bin/python scripts/check_explainer_stability.py                        # gbm, first 40 test applicants
+.venv/bin/python scripts/check_explainer_stability.py --model rf --n-inst 20
+.venv/bin/python -m pytest -q tests/test_explain.py                          # explainer unit tests only
+```
+
 ## Environment
 
 * Python **3.11** (results produced with 3.11.14 on macOS / Apple Silicon CPU)

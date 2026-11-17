@@ -107,6 +107,19 @@ def test_custom_k_is_reported(data):
     assert out["mean_top3_overlap"] == pytest.approx(1.0)
 
 
+def test_rounding_makes_tied_features_exactly_rank_stable(data):
+    _, B = data
+    # phi_j = -|w_j| * offset_j = [-0.25, -0.30, -0.30, -0.25, -0.15]: two exact ties that
+    # float summation noise breaks differently depending on the permutation order (seed).
+    X = np.tile(B.mean(axis=0) + np.linspace(0.5, 1.5, D), (4, 1))
+    model = lambda Z: 0.5 - Z @ np.abs(W_LIN)  # noqa: E731
+    raw = evaluate_seed_stability(model, X, B, SEEDS, P=4, round_decimals=None)
+    rounded = evaluate_seed_stability(model, X, B, SEEDS, P=4)  # default round_decimals=12
+    assert raw["mean_spearman"] < 1.0          # noise flips tied ranks between seeds
+    assert rounded["mean_spearman"] == 1.0     # ties restored -> identical ranks, exactly
+    assert rounded["mean_top3_overlap"] == raw["mean_top3_overlap"]  # overlap is unaffected
+
+
 # ---------------------------------------------------------------- (2) zero / constant attributions
 def test_constant_model_gives_nan_spearman_and_full_overlap(data):
     X, B = data

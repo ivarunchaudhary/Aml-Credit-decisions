@@ -111,6 +111,7 @@ def evaluate_seed_stability(
     seeds: Sequence[int] = (0, 1, 2, 3, 4),
     P: int = 16,
     k: int = 3,
+    round_decimals: int | None = 12,
 ) -> dict[str, Any]:
     """Measure how sensitive permutation-Shapley attributions are to the permutation seed.
 
@@ -119,7 +120,10 @@ def evaluate_seed_stability(
     each applicant and each unordered pair of seeds, two agreement scores are computed and
     averaged over all (applicant, seed-pair) combinations:
 
-    * **Spearman rank correlation** between the two attribution vectors.  Pairs where either
+    * **Spearman rank correlation** between the two attribution vectors.  The vectors are
+      first rounded to ``round_decimals`` places so that features with tied attributions get
+      tied ranks instead of an order decided by floating-point summation noise (which varies
+      with the permutation order, and therefore with the seed).  Pairs where either rounded
       vector is constant (rank correlation undefined) are skipped.
     * **Top-k adverse-action overlap**: the reasons produced by :func:`top_reasons` (the ``k``
       features that *increased* risk the most, positive attributions only) are compared as
@@ -135,6 +139,10 @@ def evaluate_seed_stability(
         seeds: Permutation seeds to compare; at least two distinct values are required.
         P: Number of permutations per explainer; must be even (antithetic pairs).
         k: Number of adverse-action reasons to compare (default 3).
+        round_decimals: Decimal places to round attributions to before the Spearman
+            computation only (default 12, well above float64 noise of ~1e-16 but below any
+            meaningful difference in P(bad)).  ``None`` disables rounding.  The top-``k``
+            overlap always uses the unrounded attributions.
 
     Returns:
         A dictionary with keys:
@@ -183,6 +191,8 @@ def evaluate_seed_stability(
         reasons = [set(top_reasons(phis[s, i], names, k=k)) for s in range(len(seeds))]
         for a, b in pairs:
             pa, pb = phis[a, i], phis[b, i]
+            if round_decimals is not None:
+                pa, pb = np.round(pa, round_decimals), np.round(pb, round_decimals)
             if np.ptp(pa) > 0 and np.ptp(pb) > 0:
                 rhos.append(float(spearmanr(pa, pb).statistic))
             ra, rb = reasons[a], reasons[b]

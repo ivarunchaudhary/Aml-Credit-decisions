@@ -12,9 +12,11 @@ import sys
 from pathlib import Path
 
 from docx import Document
+from docx.enum.table import WD_ROW_HEIGHT_RULE
 from docx.opc.constants import RELATIONSHIP_TYPE
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
+from docx.shared import Inches
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -471,9 +473,13 @@ contrib = [
     ("Nisha", "2481159", "Seeded explainer, fidelity/stability study, figures (explain.py); Sections 4.3, 5.5; prior-art search", "25"),
     ("Punit", "2481019", "Verifier, attack simulator, tamper experiments, tests (verify.py, attacks.py); Sections 5.3–7", "25"),
 ]
-table(doc, ["Member", "URN", "Major contributions", "Approx. %", "Manual checks, revisions and signature"],
-      [[a, b, c, d, ""] for a, b, c, d in contrib], [1.03, 0.58, 2.75, 0.59, 2.05], size=9,
-      align_cols=["left", "center", "left", "center", "left"], inner_h=True)
+contribution_table = table(
+    doc, ["Member", "URN", "Major contributions", "Approx. %", "Manual checks and revisions", "Signature"],
+    [[a, b, c, d, "", ""] for a, b, c, d in contrib], [1.03, 0.58, 2.55, 0.59, 1.43, 0.82], size=9,
+    align_cols=["left", "center", "left", "center", "left", "left"], inner_h=True,
+)
+for row in contribution_table.rows[1:]:
+    row.height, row.height_rule = Inches(0.34), WD_ROW_HEIGHT_RULE.AT_LEAST
 heading(doc, "Appendix B – Reproducibility Checklist")
 for item in [
     f"√  README with exact environment: Python {ENV['python']}, requirements.txt and pinned requirements-lock.txt.",

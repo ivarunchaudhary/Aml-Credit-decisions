@@ -1,7 +1,7 @@
 """Build the TEXL completion-status report (DOCX + PDF) against the CSE2512P Track 1 requirements.
 
 Checks the repository live (tests, notebook, report/disclosure placeholders, page counts, commits
-per member, team-repo sync) so the status can be regenerated at any time.
+per member and sign-off) so the status can be regenerated at any time.
 
 Usage:   python report/build_progress.py
 Outputs: report/TEXL_Completion_Status.docx (+ .pdf via Microsoft Word, if installed)
@@ -21,6 +21,8 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
+
+from content import REPOSITORY_URL
 
 ROOT = Path(__file__).resolve().parents[1]
 OUT = ROOT / "report" / "TEXL_Completion_Status.docx"
@@ -69,7 +71,11 @@ def pdf_pages(path: Path) -> int | None:
 
 def gather() -> dict:
     f: dict = {}
-    out = run(sys.executable, "-m", "pytest", "-q", "tests")
+    tests = subprocess.run(
+        [sys.executable, "-m", "pytest", "-q", "tests"], cwd=ROOT, capture_output=True, text=True,
+    )
+    out = tests.stdout
+    f["tests_ok"] = tests.returncode == 0
     m_pass, m_fail = re.search(r"(\d+) passed", out), re.search(r"(\d+) failed", out)
     f["tests_passed"] = int(m_pass.group(1)) if m_pass else 0
     f["tests_failed"] = int(m_fail.group(1)) if m_fail else 0
@@ -83,11 +89,18 @@ def gather() -> dict:
     rtxt, rdoc = doc_text(REPORT.with_suffix(".docx"))
     f["report_pages"] = pdf_pages(REPORT.with_suffix(".pdf"))
     f["report_refs"] = len(re.findall(r"^\[\d+\]", rtxt, flags=re.M))
-    f["repo_link_missing"] = "ADD LINK HERE" in rtxt
-    f["prior_art_docs"] = len(rdoc.tables[0].rows) - 1
-    f["report_mentions_stability"] = "evaluate_seed_stability" in rtxt or "seed stability" in rtxt.lower()
+    f["repo_link_missing"] = REPOSITORY_URL not in rtxt
+    f["prior_art_docs"] = sum(
+        not row.cells[0].text.startswith("TEXL (this work)") for row in rdoc.tables[0].rows[1:]
+    )
     contrib = next(t for t in rdoc.tables if t.rows[0].cells[0].text.strip() == "Member")
-    f["contrib_unsigned"] = [r.cells[0].text.strip() for r in contrib.rows[1:] if not r.cells[-1].text.strip()]
+    columns = [cell.text for cell in contrib.rows[0].cells]
+    signature_col = columns.index("Signature") if "Signature" in columns else -1
+    checks_col = columns.index("Manual checks and revisions") if "Manual checks and revisions" in columns else None
+    f["contrib_unsigned"] = [r.cells[0].text.strip() for r in contrib.rows[1:] if not r.cells[signature_col].text.strip()]
+    f["manual_checks_missing"] = [
+        r.cells[0].text.strip() for r in contrib.rows[1:] if checks_col is None or not r.cells[checks_col].text.strip()
+    ]
     headings = [p.text for p in rdoc.paragraphs if p.style.name == "Heading 1"]
     f["report_sections_ok"] = all(any(h.startswith(f"{i}.") for h in headings) for i in range(1, 9))
 
@@ -97,7 +110,7 @@ def gather() -> dict:
     f["dependent_claims"] = len(claims)
     f["independent_claims"] = len(re.findall(r"^1\. A computer-implemented method", dtxt, flags=re.M))
     sig = next(t for t in ddoc.tables if any(c.text.strip() == "Signature" for c in t.rows[0].cells))
-    f["inventors_unsigned"] = [r.cells[0].text.strip() for r in sig.rows[1:] if not r.cells[2].text.strip()]
+    f["inventors_unsigned"] = [r.cells[0].text.strip() for r in sig.rows[1:] if not all(c.text.strip() for c in r.cells[2:4])]
 
     commits = {name: 0 for name in MEMBERS}
     for line in run("git", "shortlog", "-sne", "HEAD").splitlines():
@@ -108,13 +121,9 @@ def gather() -> dict:
     f["commits"] = commits
 
     f["head"] = run("git", "rev-parse", "--short", "HEAD").strip()
-    f["origin_master"] = run("git", "rev-parse", "--short", "origin/master").strip()
-    f["upstream_master"] = run("git", "rev-parse", "--short", "upstream/master").strip()
-    f["upstream_behind"] = run("git", "rev-list", "--count", "upstream/master..origin/master").strip()
     f["run_all"] = (ROOT / "run_all.sh").exists()
     readme = (ROOT / "README.md").read_text(encoding="utf8")
     f["readme_ok"] = all(k in readme for k in ("## Environment", "## Seeds", "## Data", "CC BY 4.0"))
-    f["gitignore"] = (ROOT / ".gitignore").exists()
     return f
 
 
@@ -122,7 +131,7 @@ def checklist(f: dict) -> list[tuple[str, str, str, str]]:
     """(group, requirement, status, evidence) rows."""
     ok = lambda c: DONE if c else TODO  # noqa: E731
     unsigned_members = sorted(set(f["contrib_unsigned"]))
-    no_commits = [n for n, c in f["commits"].items() if c == 0]
+    missing_evidence = [name for name in unsigned_members if f["commits"].get(name, 0) == 0]
     commit_str = ", ".join(f"{n.split()[0]} {c}" for n, c in f["commits"].items())
     return [
         ("Track 1 deliverables", "Invention disclosure (DOCX + PDF)",
@@ -143,27 +152,30 @@ def checklist(f: dict) -> list[tuple[str, str, str, str]]:
          DONE, "checked in DOCX styles"),
         ("IEEE report", "Length 4–8 pages incl. references",
          ok(f["report_pages"] is not None and 4 <= f["report_pages"] <= 8),
-         f"{f['report_pages']} pages (at the upper limit)"),
-        ("IEEE report", "AI-use declaration (Section 7.3)", DONE, "present"),
+         f"{f['report_pages']} pages" if f["report_pages"] is not None else "PDF page count unavailable"),
+        ("IEEE report", "AI-use declaration (Section 7.3)", PARTIAL if f["manual_checks_missing"] else DONE,
+         "AI assistance disclosed. Manual verification awaits authors." if f["manual_checks_missing"]
+         else "AI assistance and manual verification recorded"),
         ("IEEE report", "Every dataset, library and paper cited",
          ok(f["report_refs"] >= 10), f"{f['report_refs']} IEEE-numbered references"),
-        ("IEEE report", "Contribution table (Appendix A)", DONE, "4 members, 25 % each"),
+        ("IEEE report", "Contribution table (Appendix A)", DONE, "4 members; assignments and shares await confirmation"),
         ("IEEE report", "Reproducibility checklist (Appendix B)",
          PARTIAL if f["repo_link_missing"] else DONE,
          "4/5 ticked; repository link still \"ADD LINK HERE\"" if f["repo_link_missing"] else "5/5 ticked"),
         ("Runnable package", "One-command reproduction (run_all.sh)", ok(f["run_all"]), "present"),
         ("Runnable package", "Unit tests pass",
-         ok(f["tests_passed"] > 0 and f["tests_failed"] == 0),
-         f"{f['tests_passed']} passed, {f['tests_failed']} failed"),
+         ok(f["tests_ok"] and f["tests_passed"] > 0),
+         f"{f['tests_passed']} passed, {f['tests_failed']} failed" if f["tests_ok"]
+         else "pytest exited unsuccessfully"),
         ("Runnable package", "README with environment, seeds, data source and licence",
          ok(f["readme_ok"]), "all sections present"),
         ("Team sign-off", "Every member has visible commits or a signed contribution table",
-         DONE if not no_commits or not unsigned_members else PARTIAL,
-         f"commits: {commit_str}; contribution table unsigned" if unsigned_members
-         else f"commits: {commit_str}"),
+         DONE if not missing_evidence else PARTIAL,
+         f"Commits: {commit_str}. Missing evidence: {', '.join(missing_evidence)}" if missing_evidence
+         else f"Commits: {commit_str}. Each member has contribution evidence."),
         ("Team sign-off", "Inventor signatures and dates on the disclosure",
          TODO if f["inventors_unsigned"] else DONE,
-         f"{len(f['inventors_unsigned'])} of 4 blank" if f["inventors_unsigned"] else "all signed"),
+         f"{len(f['inventors_unsigned'])} of 4 missing a signature or date" if f["inventors_unsigned"] else "all signed"),
     ]
 
 
@@ -245,9 +257,7 @@ def build(f: dict) -> None:
     d.add_heading("1. Summary", level=1)
     para(d, f"{n_done} of {len(rows)} required items are complete ({pct} %). "
             f"{n_part} {'is' if n_part == 1 else 'are'} partly done and {n_todo} {'is' if n_todo == 1 else 'are'} "
-            "not done. Every technical deliverable is finished: the invention disclosure, claims, prior-art table, "
-            "executed notebook, IEEE report and runnable package. The open items are sign-off and paperwork, "
-            "not engineering work.")
+            "not done. Section 3 lists the outstanding submission items.")
     para(d, "Method: each requirement comes from the course documents (Track Allocation & Guidelines, Research-Paper "
             "Format). Statuses are checked against the repository by report/build_progress.py. An item counts as "
             "complete only when it is fully met. M1 and M2 submissions happen outside the repository and are not "
@@ -261,26 +271,22 @@ def build(f: dict) -> None:
     todo = []
     if f["inventors_unsigned"]:
         todo.append("All four inventors sign and date the declaration table in the invention disclosure (Section 13).")
+    if f["manual_checks_missing"]:
+        todo.append("Record the manual verification and edits performed by each author in Appendix A: "
+                    + ", ".join(f["manual_checks_missing"]) + ".")
     if f["contrib_unsigned"]:
-        no_commit = [n for n, c in f["commits"].items() if c == 0]
-        todo.append("All members sign the contribution table (Appendix A). This matters most for "
-                    + " and ".join(no_commit) + ", who have no commits in the repository."
-                    if no_commit else "All members sign the contribution table (Appendix A).")
+        todo.append("Confirm contribution assignments and percentages and sign Appendix A: "
+                    + ", ".join(f["contrib_unsigned"]) + ".")
     if f["repo_link_missing"]:
-        todo.append("Replace \"ADD LINK HERE\" in Appendix B with the repository link, then rebuild the report "
-                    "(report/build_report.py).")
-    if f["upstream_behind"] not in ("", "0"):
-        todo.append(f"Open a pull request so the team repository (ivarunchaudhary) gets the latest "
-                    f"{f['upstream_behind']} commits. Its master is at {f['upstream_master']}, while "
-                    f"nisha007s/master is at {f['origin_master']}.")
+        todo.append("Add the project repository link to Appendix B and rebuild the report.")
     for t in todo or ["None."]:
         bullet(d, t)
 
     d.add_heading("4. Recent Work: Explainer Seed Stability", level=1)
-    para(d, "Added and pushed to master: evaluate_seed_stability in src/texl/explain.py. It reports the mean pairwise "
+    para(d, "The team repository includes evaluate_seed_stability in src/texl/explain.py. It reports the mean pairwise "
             "Spearman rank correlation and the top-3 adverse-action overlap across permutation seeds, with rounding "
-            "so float noise on tied features does not count as instability. Also added: 26 unit tests "
-            "(tests/test_explain.py), the script scripts/check_explainer_stability.py and a README section. "
+            "so float noise on tied features does not count as instability. The helper has regression coverage "
+            "(tests/test_explain.py) and a benchmark (scripts/check_explainer_stability.py). "
             "Results (gradient boosting, 40 test applicants, seeds 0–4):")
     table(d, ["Permutations P", "Mean Spearman", "Mean top-3 overlap", "Runtime (s)"],
           [[str(p), f"{s:.4f}", f"{o:.4f}", f"{t:.1f}"] for p, s, o, t in STABILITY], [1.4, 1.4, 1.6, 1.2])
@@ -289,15 +295,10 @@ def build(f: dict) -> None:
             "and runtime grows roughly in proportion to P. At P = 16, the budget the ledger uses, seeds agree on "
             "about 96 % of adverse-action reasons.")
 
-    d.add_heading("5. Optional Improvements (not required)", level=1)
-    if not f["report_mentions_stability"]:
-        bullet(d, "The report (Section 5.5) does not yet describe the seed-stability results. The report is already at "
-                  "the 8-page limit, so adding them means shortening something else.")
-    if not f["gitignore"]:
-        bullet(d, "Add a .gitignore for __pycache__/ and .venv/ so build files are not committed by accident.")
-
     d.save(str(OUT))
     print(f"wrote {OUT.relative_to(ROOT)}  ({n_done}/{len(rows)} done, {pct} %)")
+    if "--no-pdf" in sys.argv:
+        return
     pdf = OUT.with_suffix(".pdf")
     before = pdf.stat().st_mtime if pdf.exists() else 0.0
     try:

@@ -8,12 +8,13 @@ never drift from the code that produced the results.
 from __future__ import annotations
 
 import json
-import subprocess
 import sys
 from pathlib import Path
 
 from docx import Document
-from docx.enum.text import WD_BREAK
+from docx.opc.constants import RELATIONSHIP_TYPE
+from docx.oxml import OxmlElement
+from docx.oxml.ns import qn
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -21,7 +22,7 @@ sys.path.insert(0, str(HERE))
 
 import content as C  # noqa: E402
 from docx_style import (bullet, caption, heading, page_number_footer, para, picture,  # noqa: E402
-                        pictures_row, set_core, style_document, table)
+                        pictures_row, set_core, set_run_font, style_document, table)
 
 R = json.loads((ROOT / "results" / "results.json").read_text())
 FIG = ROOT / "results" / "figures"
@@ -440,11 +441,9 @@ heading(doc, "7.3 AI-Use Declaration (compulsory)", 2)
 para(doc, f"An AI assistant {cite('claude')} was used extensively: literature and patent search; design of the TEXL "
           "architecture and drafting of the claims; the Python implementation (package, unit tests, experiment script, "
           "notebook generator and report builder); generation of figures; and first drafts of every section of this "
-          "report. Verification: every patent number, title, assignee and date in Table I and the references was checked "
-          "against Google Patents, and every paper against the publisher or proceedings page; every number in this report is "
-          "read automatically from the output of the experiment script, and the unit tests pass. "
-          "[[HL: TEAM TO COMPLETE BEFORE SUBMISSION: state which parts each member re-checked by hand (e.g. re-ran run_all.sh, "
-          "read the patents in Table I, reviewed the claims) and what you changed or rewrote yourselves.]]")
+          "report. OpenAI Codex assisted with the final repository review, reproduction checks and submission edits. "
+          "The experiment runner supplies the quantitative results and the unit suite checks the implementation. "
+          "Appendix A provides space for each author to record their manual verification and revisions.")
 
 # ============================================================================ 8 Conclusion
 heading(doc, "8. Conclusion and Future Work")
@@ -464,16 +463,16 @@ assert not unused, f"references never cited: {unused}"
 
 # ============================================================================ Appendices
 heading(doc, "Appendix A – Contribution Table")
-para(doc, "[[HL: PROPOSED split - every member must edit this row to match what they actually did, and sign.]] Every member "
-          "must also have visible commits in the repository.", size=9, space_after=2)
+para(doc, "The assignments and percentages are provisional. Each member should confirm their contributions, "
+          "record the checks and revisions they performed, and sign their row before submission.", size=9, space_after=2)
 contrib = [
-    ("Varun Chaudhary", "2481032", "Ledger, hash chain, signatures, receipts (src/texl/ledger.py, merkle.py); Sections 4.4–4.5; claims drafting", "25"),
-    ("Om Rohilla", "2481022", "Data pipeline, models, threshold, model baselines (data.py, models.py); Sections 3, 5.2", "25"),
+    ("Varun Chaudhary", "2481032", "Ledger, hash chain, signatures, receipts (ledger.py, merkle.py); Sections 4.4–4.5; claims drafting", "25"),
+    ("Om Rohilla", "2481022", "Data pipeline, models and thresholds (data.py, models.py); Sections 3, 5.2; submission review", "25"),
     ("Nisha", "2481159", "Seeded explainer, fidelity/stability study, figures (explain.py); Sections 4.3, 5.5; prior-art search", "25"),
     ("Punit", "2481019", "Verifier, attack simulator, tamper experiments, tests (verify.py, attacks.py); Sections 5.3–7", "25"),
 ]
-table(doc, ["Member", "URN", "Major contributions (code modules, writing sections, experiments)", "Approx. %", "Signature"],
-      [[a, b, c, d, ""] for a, b, c, d in contrib], [1.15, 0.65, 3.55, 0.65, 1.0], size=9,
+table(doc, ["Member", "URN", "Major contributions", "Approx. %", "Manual checks, revisions and signature"],
+      [[a, b, c, d, ""] for a, b, c, d in contrib], [1.03, 0.58, 2.75, 0.59, 2.05], size=9,
       align_cols=["left", "center", "left", "center", "left"], inner_h=True)
 heading(doc, "Appendix B – Reproducibility Checklist")
 for item in [
@@ -484,9 +483,16 @@ for item in [
     "scripts/download_data.py prints the file SHA-256.",
     "√  One command reproduces all tables and figures: ./run_all.sh (tests → experiments → executed notebook "
     "→ this report).",
-    "[[HL: [ ] Link to private or public repository (or single zip uploaded on LMS): ADD LINK HERE.]]",
 ]:
     para(doc, item, size=10, align="left", space_after=2, left_indent=0.1)
+
+repo_line = para(doc, "√  Project repository: ", size=10, align="left", space_after=2, left_indent=0.1)
+link = OxmlElement("w:hyperlink")
+link.set(qn("r:id"), repo_line.part.relate_to(C.REPOSITORY_URL, RELATIONSHIP_TYPE.HYPERLINK, is_external=True))
+link_run = set_run_font(repo_line.add_run(C.REPOSITORY_URL))
+link_run.underline = True
+link.append(link_run._element)
+repo_line._p.append(link)
 
 doc.save(OUT_DOCX)
 print("abstract words:", _ABSTRACT_WORDS)

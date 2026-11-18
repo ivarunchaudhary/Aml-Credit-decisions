@@ -14,3 +14,4 @@ pytest
 python-docx
 docx2pdf
 pypdf
+streamlit  # live demo only (demo/app.py)

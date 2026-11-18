@@ -90,6 +90,9 @@ python3.11 -m venv .venv
 
 This runs, in order: data download (prints SHA-256 of `german.data`) → unit tests → `scripts/run_experiments.py`
 (writes `results/`) → executes the notebook → builds the report and the disclosure (DOCX; PDF via Microsoft Word if installed).
+Use `./run_all.sh --no-pdf` on machines without Word to skip PDF export. Set `PY=/path/to/python`
+to reuse an environment with the project dependencies already installed. The checked-in PDFs can be read
+independently of the reproduction environment.
 Individual steps:
 
 ```bash
@@ -128,4 +131,5 @@ disclosure/      build_disclosure.py                       -> invention disclosu
 
 ## AI-use
 
-Built with substantial AI assistance (Claude Code). See Section 7.3 of the report.
+Built with substantial AI assistance (Claude Code). OpenAI Codex assisted with the final repository review,
+reproduction checks and submission edits. See Section 7.3 of the report.

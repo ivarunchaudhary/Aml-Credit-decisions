@@ -6,6 +6,8 @@ paper against the publisher / proceedings page on 15 Nov 2026.
 
 TITLE = "TEXL: A Tamper-Evident, Replay-Verifiable Explanation Ledger for Machine-Learning Credit Decisions"
 SHORT = "TEXL"
+REPOSITORY_URL = "https://github.com/ivarunchaudhary/Aml-Credit-decisions"
+
 TEAM = "Smooth operators"
 TRACK = "1 – Patent Design"
 SECTION = "B.Tech CSE (AI/ML)"

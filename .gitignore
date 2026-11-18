@@ -1,7 +1,8 @@
-__pycache__/
-*.pyc
-.pytest_cache/
 .venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ipynb_checkpoints/
 data/
 docs/superpowers/
 .superpowers/

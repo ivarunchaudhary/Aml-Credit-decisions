@@ -207,10 +207,8 @@ def table(doc, header, rows, widths_in, size=9, align_cols=None, bold_header=Tru
     t.autofit = False
     _borders(t, inner=inner_h)
     _cell_margins(t)
-    tblPr = t._tbl.tblPr
-    layout = OxmlElement("w:tblLayout")
-    layout.set(qn("w:type"), "fixed")
-    tblPr.append(layout)
+    for column, width in zip(t.columns, widths_in, strict=True):
+        column.width = Inches(width)
     align_cols = align_cols or ["left"] * len(header)
     amap = {"left": WD_ALIGN_PARAGRAPH.LEFT, "center": WD_ALIGN_PARAGRAPH.CENTER,
             "right": WD_ALIGN_PARAGRAPH.RIGHT}
@@ -237,7 +235,7 @@ def table(doc, header, rows, widths_in, size=9, align_cols=None, bold_header=Tru
             p.paragraph_format.space_after = Pt(0)
             p.paragraph_format.space_before = Pt(0)
             p.paragraph_format.line_spacing_rule = WD_LINE_SPACING.SINGLE
-            p.paragraph_format.keep_with_next = r_i < len(rows)   # keep the table on one page
+            p.paragraph_format.keep_with_next = r_i == 0   # keep the header with its first data row
             add_rich(p, str(val), size=size, bold=(bold_header and r_i == 0))
     # header bottom rule
     for cell in t.rows[0].cells:
@@ -262,15 +260,24 @@ def picture(doc, path, width_in):
 
 
 def pictures_row(doc, paths_widths):
-    p = doc.add_paragraph()
-    p.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    p.paragraph_format.space_after = Pt(0)
-    p.paragraph_format.keep_with_next = True
-    for i, (path, w) in enumerate(paths_widths):
-        if i:
-            set_run_font(p.add_run(" "), 10)
-        p.add_run().add_picture(str(path), width=Inches(w))
-    return p
+    row = doc.add_table(rows=1, cols=len(paths_widths))
+    row.alignment = WD_TABLE_ALIGNMENT.CENTER
+    row.autofit = False
+    _borders(row, inner=False)
+    borders = row._tbl.tblPr.find(qn("w:tblBorders"))
+    for border in borders:
+        border.set(qn("w:val"), "nil")
+    _cell_margins(row, top=0, bottom=0, left=0, right=0)
+    row.rows[0]._tr.get_or_add_trPr().append(OxmlElement("w:cantSplit"))
+    for index, (path, width) in enumerate(paths_widths):
+        row.columns[index].width = Inches(width + 0.1)
+        cell = row.cell(0, index)
+        cell.width = row.columns[index].width
+        p = cell.paragraphs[0]
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        p.paragraph_format.space_after = Pt(0)
+        p.paragraph_format.keep_with_next = True
+        p.add_run().add_picture(str(path), width=Inches(width))
 
 
 def page_number_footer(doc):

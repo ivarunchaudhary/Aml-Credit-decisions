@@ -31,6 +31,28 @@ verifier levels V0–V7), the effect of the epoch size on insider attacks in the
 overhead, scalability and explanation fidelity (incl. agreement with the SHAP library's KernelExplainer).
 A full run takes about 12 minutes on a laptop CPU.
 
+### Live demo
+
+`demo/app.py` is a Streamlit app for the presentation and viva. It rebuilds the same system as
+`run_experiments.py` (seed 42, gradient boosting, P = 16) and preloads a ledger with 72 test applicants
+(2 sealed epochs of 32 plus an unsealed tail of 8).
+
+| Tab | What it shows |
+|---|---|
+| Decide | pick an applicant, edit duration / amount / age / checking / savings, get the decision, the per-attribute contributions, the signed record and the receipt; "Verify my receipt" runs the applicant-side checks |
+| Ledger | every record with its hash, previous hash and sealed / unsealed status, plus the published checkpoints |
+| Tamper & verify | run any attack A1–A9 on a copy of the ledger and see which verifier level (V0–V7) catches it and why |
+| Results | the 200-run detection table and the report figures (fallback if anything fails live) |
+
+```bash
+.venv/bin/pip install streamlit
+.venv/bin/streamlit run demo/app.py        # opens http://localhost:8501; first start takes about 15 s
+```
+
+Truncation (A6) is only caught when an applicant from the deleted tail shows a receipt, so most seeds
+miss it (21.5 % in the report); seeds 1, 8, 9, 12 and 13 show a catch. The demo signing key is derived
+from a fixed string and is **not for production**.
+
 ### Explainer seed stability
 
 `evaluate_seed_stability(model, X, B, seeds, P)` in `src/texl/explain.py` checks how much the permutation seed moves
@@ -95,8 +117,9 @@ receipt-sampling seed 99 · salts seed 7 · KernelExplainer NumPy seed 0 · demo
 
 ```
 src/texl/        canonical.py data.py models.py explain.py merkle.py ledger.py verify.py attacks.py
-scripts/         download_data.py run_experiments.py
-tests/           test_texl.py
+scripts/         download_data.py run_experiments.py check_explainer_stability.py
+demo/            core.py app.py                            -> Streamlit live demo
+tests/           test_texl.py test_explain.py test_demo.py
 notebooks/       make_notebook.py TEXL_PoC.ipynb
 results/         results.json tables/*.csv figures/*.png example_record.json example_receipt.json
 report/          content.py docx_style.py build_report.py  -> report DOCX/PDF

@@ -90,3 +90,29 @@ def test_app_starts_without_error():
     at = AppTest.from_file(str(ROOT / "demo" / "app.py"), default_timeout=300).run()
     assert not at.exception
     assert [t.label for t in at.tabs] == ["Decide", "Ledger", "Tamper & verify", "Results"]
+
+
+def _app():
+    from streamlit.testing.v1 import AppTest
+    return AppTest.from_file(str(ROOT / "demo" / "app.py"), default_timeout=300).run()
+
+
+def _click(at, label):
+    next(b for b in at.button if b.label == label).click().run()
+
+
+def test_shown_risk_agrees_with_decision():
+    at = _app()
+    next(s for s in at.selectbox if s.label == "Test applicant").set_value(71).run()  # P(bad) 0.099994
+    _click(at, "Decide and record")
+    m = {x.label: x.value for x in at.metric}
+    rejected = "REJECT" in m["Decision"]
+    assert rejected == (float(m["Risk P(bad)"]) >= float(m["Reject if risk ≥"]))
+
+
+def test_result_hidden_after_switching_applicant():
+    at = _app()
+    _click(at, "Decide and record")
+    assert any(x.label == "Decision" for x in at.metric)
+    next(s for s in at.selectbox if s.label == "Test applicant").set_value(1).run()
+    assert not any(x.label == "Decision" for x in at.metric)

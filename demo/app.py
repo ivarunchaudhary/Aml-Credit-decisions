@@ -71,17 +71,19 @@ with decide_tab:
             row[col] = st.selectbox(title, opts, index=opts.index(row[col].iloc[0]),
                                     format_func=lambda v, c=col: LABELS[c].get(v, v), key=f"{col}{idx}")
         if st.button("Decide and record", type="primary", width="stretch"):
-            st.session_state["last"] = decide(demo, ledger, row)
+            st.session_state["last"] = (row, decide(demo, ledger, row))
 
     with right:
-        out = st.session_state.get("last")
+        last_row, out = st.session_state.get("last", (None, None))
+        if out is not None and not last_row.equals(row):  # inputs changed since the last decision
+            out = None
         if out is None:
             st.info("Pick an applicant and press **Decide and record**.")
         else:
             rejected = out["decision"] == "REJECT"
             c1, c2, c3 = st.columns(3)
             c1.metric("Decision", ("❌ " if rejected else "✅ ") + out["decision"])
-            c2.metric("Risk P(bad)", f"{out['score']:.3f}")
+            c2.metric("Risk P(bad)", f"{out['score']:.6f}")
             c3.metric("Reject if risk ≥", f"{out['threshold']:.2f}")
 
             st.subheader("Why? Contribution of each attribute to the risk")

@@ -484,7 +484,7 @@ for item in [
     "scripts/download_data.py prints the file SHA-256.",
     "√  One command reproduces all tables and figures: ./run_all.sh (tests → experiments → executed notebook "
     "→ this report).",
-    "[[HL: [ ] Link to private or public repository (or single zip uploaded on LMS): ADD LINK HERE.]]",
+    "√  Repository: https://github.com/ivarunchaudhary/Aml-Credit-decisions",
 ]:
     para(doc, item, size=10, align="left", space_after=2, left_indent=0.1)
 

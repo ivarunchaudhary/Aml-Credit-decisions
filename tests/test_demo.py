@@ -83,3 +83,10 @@ def test_attack_report_is_deterministic(demo):
 
 def test_load_results_missing(tmp_path):
     assert load_results(tmp_path) is None
+
+
+def test_app_starts_without_error():
+    from streamlit.testing.v1 import AppTest
+    at = AppTest.from_file(str(ROOT / "demo" / "app.py"), default_timeout=300).run()
+    assert not at.exception
+    assert [t.label for t in at.tabs] == ["Decide", "Ledger", "Tamper & verify", "Results"]
